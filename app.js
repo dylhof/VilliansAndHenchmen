@@ -64,16 +64,12 @@ app.get('/api/v1/henchmen/:id', (request, response) => {
 })
 
 app.post('/api/v1/villains', (request, response) => {
-  const { name, movie, species } = request.body
-
-  if (!name) {
-    return response.status(422).json('Sorry! We can not post a villain without a name!')
-  } else if (!movie) {
-    return response.status(422).json('Sorry! We can not post a villain without a movie!')
-  } else if (!species) {
-    return response.status(422).json('Sorry! We can not post a villain without a species!')
+  const villain = request.body
+  for (let requiredParam of ['name', 'movie', 'species']) {
+    if(!villain[requiredParam]) {
+      return response.status(422).send({error: `Sorry! We need a ${requiredParam} to post a villain`})
+    }
   }
-
   database('villains')
     .returning('id')
     .insert({name, movie, species})
@@ -82,5 +78,46 @@ app.post('/api/v1/villains', (request, response) => {
     })
     .catch(error => {
       response.status(500).json(`There has been an error posting your villain: ${error}`)
+    })
+})
+
+app.post('/api/v1/henchmen', (request, response) => {
+  const { name, species, villain_id } = request.body
+
+  
+  if (!name || !species || !villain_id) {
+    return response.status(422).json(`Sorry! you need a name, species and villain id for this henchman!`)
+  } 
+  
+  let villain 
+
+  database('villain').where('id', villain_id)
+    .then( foundVillain => villain = foundVillain)
+  
+  if(!villain) {
+    return response.status(422).json(`A henchman can only exist if there is a villain to serve! ${villain}`)
+  }
+
+  database('henchmen')
+    .returning('id')
+    .insert({ name, species, villain_id })
+    .then( id => {
+      response.status(200).json(`Success! You posted a henchman with the id ${id}!`)
+    })
+    .catch(error => {
+      response.status(500).json(`There has been an error posting the henchman: ${error}`)
+    })
+})
+
+app.delete('/api/v1/henchmen/:id',(request, response) => {
+  database('henchmen')
+    .where('id', request.params.id)
+    .select()
+    .del()
+    .then( () => {
+      return response.sendStatus(204)
+    })
+    .catch(error => {
+      return response.status(500).json({error: 'something went wrong'})
     })
 })
